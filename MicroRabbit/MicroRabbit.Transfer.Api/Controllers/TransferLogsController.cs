@@ -20,7 +20,7 @@ namespace MicroRabbit.Transfer.Api.Controllers
         [HttpGet]
         public ActionResult<IEnumerable<TransferLog>> GetTransferLogs()
         {
-            return Ok(_transferService.GetTranferLogs());
+            return Ok(_transferService.GetTransferLogs());
         }
     }
 }

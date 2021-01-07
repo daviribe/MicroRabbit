@@ -24,7 +24,7 @@ namespace MicroRabbit.Infra.Ioc
         public static void RegisterServices(IServiceCollection services)
         {
             // Domain Bus
-            services.AddSingleton<IEventBus, RabbitBus>(provider => 
+            services.AddSingleton<IEventBus, RabbitBus>(provider =>
                 new RabbitBus(provider.GetService<IMediator>(), provider.GetRequiredService<IServiceScopeFactory>()));
 
             // Subscriptions
@@ -34,7 +34,7 @@ namespace MicroRabbit.Infra.Ioc
             services.AddTransient<IEventHandler<TransferCreatedEvent>, TransferEventHandler>();
 
             // Domain Commands
-            services.AddTransient<IRequestHandler<CreateTransferCommand, bool>, TransferCommandHandler>();        
+            services.AddTransient<IRequestHandler<CreateTransferCommand, bool>, TransferCommandHandler>();
 
             // Application Services
             services.AddTransient<IAccountService, AccountService>();

@@ -75,7 +75,7 @@ namespace MicroRabbit.Transfer.Api
         private static void ConfigureEventBus(IApplicationBuilder app)
         {
             var eventBus = app.ApplicationServices.GetRequiredService<IEventBus>();
-            
+
             eventBus.Subscribe<TransferCreatedEvent, TransferEventHandler>();
         }
     }

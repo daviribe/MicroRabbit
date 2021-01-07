@@ -36,16 +36,18 @@ namespace MicroRabbit.Infra.Bus
 
         public void Publish<T>(T @event) where T : Event
         {
-            var factory = new ConnectionFactory { HostName = "localhost" };
+            var factory = new ConnectionFactory() { HostName = "localhost" };
 
             using var connection = factory.CreateConnection();
             using var channel = connection.CreateModel();
 
-            var eventName = @event.GetType().Name;
             var message = JsonConvert.SerializeObject(@event);
-            var body = Encoding.UTF8.GetBytes(message);
+            var eventName = @event.GetType().Name;
 
             channel.QueueDeclare(eventName, false, false, false, null);
+
+            var body = Encoding.UTF8.GetBytes(message);
+
             channel.BasicPublish("", eventName, null, body);
         }
 
@@ -57,14 +59,20 @@ namespace MicroRabbit.Infra.Bus
             var handlerType = typeof(TH);
 
             if (!_eventTypes.Contains(typeof(T)))
+            {
                 _eventTypes.Add(typeof(T));
+            }
 
             if (!_handlers.ContainsKey(eventName))
+            {
                 _handlers.Add(eventName, new List<Type>());
+            }
 
-            if (_handlers[eventName].Any(s => s == handlerType))
+            if (_handlers[eventName].Any(s => s.GetType() == handlerType))
+            {
                 throw new ArgumentException(
-                    $"The Handler Type {handlerType.Name} already is registered for '{eventName}'", nameof(handlerType));
+                    $"Handler Type {handlerType.Name} already is registered for '{eventName}'", nameof(handlerType));
+            }
 
             _handlers[eventName].Add(handlerType);
 
@@ -73,10 +81,14 @@ namespace MicroRabbit.Infra.Bus
 
         private void StartBasicConsume<T>() where T : Event
         {
-            var factory = new ConnectionFactory { HostName = "localhost", DispatchConsumersAsync = true };
+            var factory = new ConnectionFactory()
+            {
+                HostName = "localhost",
+                DispatchConsumersAsync = true
+            };
 
-            using var connection = factory.CreateConnection();
-            using var channel = connection.CreateModel();
+            var connection = factory.CreateConnection();
+            var channel = connection.CreateModel();
 
             var eventName = typeof(T).Name;
 
@@ -89,10 +101,10 @@ namespace MicroRabbit.Infra.Bus
             channel.BasicConsume(eventName, true, consumer);
         }
 
-        private async Task Consumer_Received(object sender, BasicDeliverEventArgs @event)
+        private async Task Consumer_Received(object sender, BasicDeliverEventArgs e)
         {
-            var eventName = @event.RoutingKey;
-            var message = Encoding.UTF8.GetString(@event.Body.ToArray());
+            var eventName = e.RoutingKey;
+            var message = Encoding.UTF8.GetString(e.Body.ToArray());
 
             await ProcessEvent(eventName, message).ConfigureAwait(false);
         }
@@ -111,13 +123,13 @@ namespace MicroRabbit.Infra.Bus
 
                     if (handler == null) continue;
 
-                    var eventType = _eventTypes.Single(t => t.Name == eventName);
+                    var eventType = _eventTypes.SingleOrDefault(t => t.Name == eventName);
 
                     var @event = JsonConvert.DeserializeObject(message, eventType);
 
                     var concreteType = typeof(IEventHandler<>).MakeGenericType(eventType);
 
-                    await (Task)concreteType.GetMethod("Handle")?.Invoke(handler, new[] { @event });
+                    await (Task)concreteType.GetMethod("Handle")?.Invoke(handler, new object[] { @event });
                 }
             }
         }

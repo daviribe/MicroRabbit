@@ -5,6 +5,6 @@ namespace MicroRabbit.Transfer.Application.Interfaces
 {
     public interface ITransferService
     {
-        IEnumerable<TransferLog> GetTranferLogs();
+        IEnumerable<TransferLog> GetTransferLogs();
     }
 }
