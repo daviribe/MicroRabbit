@@ -3,7 +3,7 @@ using MicroRabbit.Banking.Domain.Interfaces;
 using MicroRabbit.Banking.Domain.Models;
 using System.Collections.Generic;
 
-namespace MicroRabbit.Banking.Data.Repositories
+namespace MicroRabbit.Banking.Data.Repository
 {
     public class AccountRepository : IAccountRepository
     {

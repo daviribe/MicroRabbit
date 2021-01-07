@@ -2,6 +2,7 @@
 using MicroRabbit.Domain.Core.Bus;
 using MicroRabbit.Domain.Core.Commands;
 using MicroRabbit.Domain.Core.Events;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -16,14 +17,21 @@ namespace MicroRabbit.Infra.Bus
     public sealed class RabbitBus : IEventBus
     {
         private readonly IMediator _mediator;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
         private readonly Dictionary<string, List<Type>> _handlers;
         private readonly List<Type> _eventTypes;
 
-        public RabbitBus(IMediator mediator)
+        public RabbitBus(IMediator mediator, IServiceScopeFactory serviceScopeFactory)
         {
             _mediator = mediator;
+            _serviceScopeFactory = serviceScopeFactory;
             _handlers = new Dictionary<string, List<Type>>();
             _eventTypes = new List<Type>();
+        }
+
+        public Task SendCommand<T>(T command) where T : Command
+        {
+            return _mediator.Send(command);
         }
 
         public void Publish<T>(T @event) where T : Event
@@ -39,11 +47,6 @@ namespace MicroRabbit.Infra.Bus
 
             channel.QueueDeclare(eventName, false, false, false, null);
             channel.BasicPublish("", eventName, null, body);
-        }
-
-        public Task SendCommand<T>(T command) where T : Command
-        {
-            return _mediator.Send(command);
         }
 
         public void Subscribe<T, TH>()
@@ -91,7 +94,6 @@ namespace MicroRabbit.Infra.Bus
             var eventName = @event.RoutingKey;
             var message = Encoding.UTF8.GetString(@event.Body.ToArray());
 
-
             await ProcessEvent(eventName, message).ConfigureAwait(false);
         }
 
@@ -99,11 +101,13 @@ namespace MicroRabbit.Infra.Bus
         {
             if (_handlers.ContainsKey(eventName))
             {
+                using var scope = _serviceScopeFactory.CreateScope();
+
                 var subscriptions = _handlers[eventName];
 
                 foreach (var subscription in subscriptions)
                 {
-                    var handler = Activator.CreateInstance(subscription);
+                    var handler = scope.ServiceProvider.GetService(subscription);
 
                     if (handler == null) continue;
 
@@ -113,12 +117,7 @@ namespace MicroRabbit.Infra.Bus
 
                     var concreteType = typeof(IEventHandler<>).MakeGenericType(eventType);
 
-                    var task = (Task)concreteType.GetMethod("Handle")?.Invoke(handler, new[] { @event });
-
-                    if (task == null)
-                        throw new ArgumentException($"Handler of type {concreteType} returned null");
-
-                    await task;
+                    await (Task)concreteType.GetMethod("Handle")?.Invoke(handler, new[] { @event });
                 }
             }
         }
